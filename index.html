@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <title>描红字帖生成器</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <style>
+    body { font-family: sans-serif; padding: 1.5em; background: #f9f9f9; max-width: 1000px; margin: auto; }
+    label, .input-group { display: inline-block; vertical-align: top; margin-right: 1.5em; margin-top: 1em; }
+    .input-group { margin-bottom: 1em; }
+    .grid-option, .line-option { margin-right: 1em; }
+    #previewArea { margin-top: 1em; padding: 1em; background: white; border: 1px dashed #ccc; font-size: 36px; font-family: sans-serif; }
+    canvas { margin-top: 2em; border: 1px solid #ccc; background: white; display: none; }
+    iframe { width: 100%; height: 800px; border: none; margin-top: 2em; }
+    .form-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 1.5em; }
+    .form-row > * { flex-grow: 1; min-width: 180px; }
+    #text { width: 450px; height: 200px; }
+  </style>
+  <link id="googleFontLink" rel="stylesheet">
+</head>
+<body>
+  <h1>描红字帖生成器</h1>
+
+  <div class="form-row">
+    <label>上传字体文件：<input type="file" id="fontFile" accept=".ttf,.otf" /></label>
+    <label>Google 字体：<select id="googleFont"></select></label>
+    <label>字体大小：<input type="number" id="fontSize" value="36" min="12" max="100" /></label>
+    <label>描红颜色：<input type="color" id="fontColor" value="#ff0000" /></label>
+    <label>网格颜色：<input type="color" id="gridColor" value="#cccccc" /></label>
+    <label>跳过标点：<input type="checkbox" id="skipPunctuation" checked /></label>
+  </div>
+
+  <label>字体预览：<div id="previewArea">字体预览示例文字</div></label>
+
+  <label>描红内容：<textarea id="text">春眠不觉晓，处处闻啼鸟。夜来风雨声，花落知多少。</textarea></label>
+
+  <div class="form-row">
+    <label>格子类型：
+      <span class="grid-option"><input type="radio" name="grid" value="mi" checked /> 米字格</span>
+      <span class="grid-option"><input type="radio" name="grid" value="tian" /> 田字格</span>
+    </label>
+    <label>每字一行：<input type="checkbox" id="charPerLine" /></label>
+    <label>描红数量：<input type="number" id="guideCount" value="3" min="0" max="20" /></label>
+    <label>作者名：<input type="text" id="author" placeholder="如：李明" /></label>
+    <button onclick="runGenerateMultipleTimes()">生成 PDF</button>
+  </div>
+
+  <canvas id="canvas" width="794" height="1123"></canvas>
+  <iframe id="pdfPreview"></iframe>
+
+  <script>
+    const { jsPDF } = window.jspdf;
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+    let loadedFont = null;
+    let uploadedFontName = null;
+
+    const previewArea = document.getElementById("previewArea");
+    const fontSizeInput = document.getElementById("fontSize");
+    const textInput = document.getElementById("text");
+
+    fontSizeInput.addEventListener("input", () => {
+      previewArea.style.fontSize = fontSizeInput.value + "px";
+    });
+
+    document.getElementById("charPerLine").addEventListener("change", function() {
+      document.getElementById("guideCount").disabled = !this.checked;
+    });
+    window.addEventListener("DOMContentLoaded", () => {
+      document.getElementById("guideCount").disabled = !document.getElementById("charPerLine").checked;
+    });
+
+    async function fetchChineseGoogleFonts() {
+      const chineseFonts = [
+        "ZCOOL KuaiLe", "ZCOOL XiaoWei", "ZCOOL QingKe HuangYou", 
+        "Ma Shan Zheng", "Zhi Mang Xing", "Long Cang", "Liu Jian Mao Cao",
+        "Noto Sans SC", "Noto Serif SC", "Noto Sans TC", "Noto Serif TC", "Noto Sans HK", "Noto Serif HK",
+        "Denk One", "Edu NSW ACT Foundation", "Kirang Haerang", "Gaegu", "Gugi", "Cute Font"
+      ];
+      const select = document.getElementById("googleFont");
+      select.innerHTML = '<option value="">-- 选择字体 --</option>' +
+        chineseFonts.map(f => `<option value="${f}">${f}</option>`).join('');
+    }
+
+    fetchChineseGoogleFonts();
+
+    document.getElementById("googleFont").addEventListener("change", async (e) => {
+      const selectedFont = e.target.value;
+      if (!selectedFont) return;
+      const fontLink = document.getElementById("googleFontLink");
+      fontLink.href = `https://fonts.googleapis.com/css2?family=${selectedFont.replace(/ /g, "+")}&display=swap`;
+      try {
+        await document.fonts.load(`1em '${selectedFont}'`);
+        if (!uploadedFontName) {
+          previewArea.style.fontFamily = `'${selectedFont}', sans-serif`;
+          previewArea.style.fontSize = fontSizeInput.value + "px";
+          loadedFont = selectedFont;
+        }
+      } catch (err) {
+        console.warn("字体加载失败：", err);
+      }
+    });
+
+    document.getElementById("fontFile").addEventListener("change", async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const fontName = file.name.replace(/\.[^/.]+$/, "");
+      uploadedFontName = fontName;
+      const reader = new FileReader();
+      reader.onload = function () {
+        const font = new FontFace(fontName, reader.result);
+        font.load().then((loaded) => {
+          document.fonts.add(loaded);
+          previewArea.style.fontFamily = `'${fontName}', sans-serif`;
+          previewArea.style.fontSize = fontSizeInput.value + "px";
+          loadedFont = fontName;
+        });
+      };
+      reader.readAsArrayBuffer(file);
+    });
+
+    function runGenerateMultipleTimes() {
+      generatePDF();
+      setTimeout(generatePDF, 300);
+      setTimeout(generatePDF, 600);
+    }
+
+    function drawGrid(x, y, size, type) {
+      const gridColor = document.getElementById("gridColor").value;
+      ctx.strokeStyle = gridColor;
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 2]);
+      ctx.strokeRect(x, y, size, size);
+
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.moveTo(x + size / 2, y); ctx.lineTo(x + size / 2, y + size);
+      ctx.moveTo(x, y + size / 2); ctx.lineTo(x + size, y + size / 2);
+      ctx.stroke();
+
+      if (type === "mi") {
+        ctx.setLineDash([4, 2]);
+        ctx.beginPath();
+        ctx.moveTo(x, y); ctx.lineTo(x + size, y + size);
+        ctx.moveTo(x + size, y); ctx.lineTo(x, y + size);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
+
+    function drawCharacter(char, x, y, size, font, color, drawText) {
+      drawGrid(x, y, size, document.querySelector('input[name="grid"]:checked').value);
+      if (drawText) {
+        ctx.fillStyle = color;
+        ctx.font = `${size * 0.8}px "${font}"`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(char, x + size / 2, y + size / 2);
+      }
+    }
+
+    async function generatePDF() {
+      const rawText = document.getElementById("text").value.trim();
+      const text = rawText.replace(/\s+/g, "");
+      const skipPunctuation = document.getElementById("skipPunctuation").checked;
+      const fontSize = parseInt(document.getElementById("fontSize").value);
+      const fontColor = document.getElementById("fontColor").value;
+      const oneCharPerLine = document.getElementById("charPerLine").checked;
+      const guideCount = parseInt(document.getElementById("guideCount").value);
+      const author = document.getElementById("author").value;
+      const font = uploadedFontName || loadedFont || "sans-serif";
+      const pageWidth = canvas.width;
+      const pageHeight = canvas.height;
+
+      const gridSize = fontSize + 10;
+      const margin = 40;
+      const cols = Math.floor((pageWidth - margin * 2) / gridSize);
+      const rows = Math.floor((pageHeight - margin * 2 - 40) / gridSize);
+      const chars = [...text].filter(c => !skipPunctuation || !/[\u3000-\u303F\uFF00-\uFFEF.,!?！？。；，、]/.test(c));
+      const charsPerPage = oneCharPerLine ? chars.length : rows * cols;
+      const pages = oneCharPerLine ? Math.ceil(chars.length / rows) : Math.ceil(chars.length / charsPerPage);
+
+      const pdf = new jsPDF({ unit: "px", format: [pageWidth, pageHeight] });
+
+      for (let p = 0; p < pages; p++) {
+        ctx.clearRect(0, 0, pageWidth, pageHeight);
+        ctx.fillStyle = "white";
+        ctx.fillRect(0, 0, pageWidth, pageHeight);
+
+        if (oneCharPerLine) {
+          const totalRows = Math.floor((pageHeight - margin * 2 - 40) / gridSize);
+          for (let row = 0; row < totalRows; row++) {
+            const i = p * totalRows + row;
+            const char = chars[i];
+            if (!char) break;
+            for (let col = 0; col < cols; col++) {
+              const x = margin + col * gridSize;
+              const y = margin + row * gridSize;
+              const showChar = col < guideCount;
+              drawCharacter(char, x, y, gridSize, font, fontColor, showChar);
+            }
+          }
+        } else {
+          const start = p * charsPerPage;
+          const end = Math.min((p + 1) * charsPerPage, chars.length);
+          for (let i = start; i < end; i++) {
+            const char = chars[i];
+            const index = i - start;
+            const col = index % cols;
+            const row = Math.floor(index / cols);
+            const x = margin + col * gridSize;
+            const y = margin + row * gridSize;
+            drawCharacter(char, x, y, gridSize, font, fontColor, true);
+          }
+        }
+
+        ctx.fillStyle = "#666";
+        ctx.font = "12px sans-serif";
+        ctx.fillText(`第 ${p + 1} 页`, pageWidth - 80, pageHeight - 20);
+        const today = new Date().toLocaleDateString();
+        if (author) ctx.fillText(`作者：${author}`, margin, pageHeight - 20);
+        ctx.fillText(today, margin, pageHeight - 8);
+
+        const imgData = canvas.toDataURL("image/png");
+        if (p > 0) pdf.addPage();
+        pdf.addImage(imgData, "PNG", 0, 0, pageWidth, pageHeight);
+      }
+
+      const pdfBlob = pdf.output("bloburl");
+      document.getElementById("pdfPreview").src = pdfBlob;
+    }
+  </script>
+</body>
+</html>
