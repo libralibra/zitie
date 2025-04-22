@@ -14,8 +14,8 @@
     iframe { width: 100%; height: 800px; border: none; margin-top: 2em; }
     .form-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 1.5em; }
     .form-row > * { flex-grow: 1; min-width: 180px; }
-    #text { width: 450px; height: 200px; }
     #loadingStatus { display: none; font-weight: bold; color: green; margin-top: 1em; }
+    #text { width: 450px; height: 200px; }
   </style>
   <link id="googleFontLink" rel="stylesheet">
 </head>
@@ -89,16 +89,15 @@
 
     document.getElementById("googleFont").addEventListener("change", async (e) => {
       const selectedFont = e.target.value;
-      if (!selectedFont) return;
+      if (!selectedFont || uploadedFontName) return;
       const fontLink = document.getElementById("googleFontLink");
       fontLink.href = `https://fonts.googleapis.com/css2?family=${selectedFont.replace(/ /g, "+")}&display=swap`;
       try {
         await document.fonts.load(`1em '${selectedFont}'`);
-        if (!uploadedFontName) {
-          previewArea.style.fontFamily = `'${selectedFont}', sans-serif`;
-          previewArea.style.fontSize = fontSizeInput.value + "px";
-          loadedFont = selectedFont;
-        }
+        await document.fonts.ready;
+        previewArea.style.fontFamily = `'${selectedFont}', sans-serif`;
+        previewArea.style.fontSize = fontSizeInput.value + "px";
+        loadedFont = selectedFont;
       } catch (err) {
         console.warn("字体加载失败：", err);
       }
@@ -110,14 +109,19 @@
       const fontName = file.name.replace(/\.[^/.]+$/, "");
       uploadedFontName = fontName;
       const reader = new FileReader();
-      reader.onload = function () {
-        const font = new FontFace(fontName, reader.result);
-        font.load().then((loaded) => {
-          document.fonts.add(loaded);
+      reader.onload = async function () {
+        try {
+          const font = new FontFace(fontName, reader.result);
+          await font.load();
+          document.fonts.add(font);
+          await document.fonts.ready;
           previewArea.style.fontFamily = `'${fontName}', sans-serif`;
           previewArea.style.fontSize = fontSizeInput.value + "px";
           loadedFont = fontName;
-        });
+          document.getElementById("googleFont").value = "";
+        } catch (err) {
+          console.error("字体加载失败：", err);
+        }
       };
       reader.readAsArrayBuffer(file);
     });
