@@ -15,6 +15,7 @@
     .form-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 1.5em; }
     .form-row > * { flex-grow: 1; min-width: 180px; }
     #text { width: 450px; height: 200px; }
+    #loadingStatus { display: none; font-weight: bold; color: green; margin-top: 1em; }
   </style>
   <link id="googleFontLink" rel="stylesheet">
 </head>
@@ -44,6 +45,8 @@
     <label>作者名：<input type="text" id="author" placeholder="如：李明" /></label>
     <button onclick="runGenerateMultipleTimes()">生成 PDF</button>
   </div>
+
+  <div id="loadingStatus">正在生成 PDF，请稍候...</div>
 
   <canvas id="canvas" width="794" height="1123"></canvas>
   <iframe id="pdfPreview"></iframe>
@@ -120,9 +123,14 @@
     });
 
     function runGenerateMultipleTimes() {
+      const status = document.getElementById("loadingStatus");
+      status.style.display = "block";
       generatePDF();
       setTimeout(generatePDF, 300);
-      setTimeout(generatePDF, 600);
+      setTimeout(() => {
+        generatePDF();
+        status.style.display = "none";
+      }, 600);
     }
 
     function drawGrid(x, y, size, type) {
