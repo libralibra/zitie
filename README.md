@@ -13,3 +13,5 @@
 描红字帖生成，可打印PDF生成，
 
 ![截图](screenshot.png)
+
+更复杂的字帖生成，可尝试：[https://xgzb.top/han](https://xgzb.top/han)
