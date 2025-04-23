@@ -1,31 +1,95 @@
 <!DOCTYPE html>
 <html lang="zh">
+
 <head>
   <meta charset="UTF-8">
   <title>描红字帖生成器</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <style>
-    body { font-family: sans-serif; padding: 1.5em; background: #f9f9f9; max-width: 1000px; margin: auto; }
-    label, .input-group { display: inline-block; vertical-align: top; margin-right: 1.5em; margin-top: 1em; }
-    .input-group { margin-bottom: 1em; }
-    .grid-option, .line-option { margin-right: 1em; }
-    #previewArea { margin-top: 1em; padding: 1em; background: white; border: 1px dashed #ccc; font-size: 36px; font-family: sans-serif; }
-    canvas { margin-top: 2em; border: 1px solid #ccc; background: white; display: none; }
-    iframe { width: 100%; height: 800px; border: none; margin-top: 2em; }
-    .form-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 1.5em; }
-    .form-row > * { flex-grow: 1; min-width: 180px; }
-    #loadingStatus { display: none; font-weight: bold; color: green; margin-top: 1em; }
-    #text { width: 450px; height: 200px; }
+    body {
+      font-family: sans-serif;
+      padding: 1.5em;
+      background: #f9f9f9;
+      /* max-width: 1000px; */
+      margin: auto;
+    }
+
+    label,
+    .input-group {
+      display: inline-block;
+      vertical-align: top;
+      margin-right: 1.5em;
+      margin-top: 1em;
+    }
+
+    .input-group {
+      margin-bottom: 1em;
+    }
+
+    .grid-option,
+    .line-option {
+      margin-right: 1em;
+    }
+
+    #previewArea {
+      margin-top: 1em;
+      padding: 1em;
+      background: white;
+      border: 1px dashed #ccc;
+      font-size: 36px;
+      font-family: sans-serif;
+    }
+
+    canvas {
+      margin-top: 2em;
+      border: 1px solid #ccc;
+      background: white;
+      display: none;
+    }
+
+    iframe {
+      width: 100%;
+      height: 800px;
+      border: none;
+      margin-top: 2em;
+    }
+
+    .form-row {
+      display: flex;
+      flex-wrap: none;
+      align-items: flex-end;
+      gap: 1.5em;
+    }
+
+    .form-row>* {
+      flex-grow: 1;
+      min-width: 180px;
+    }
+
+    #loadingStatus {
+      display: none;
+      font-weight: bold;
+      color: green;
+      margin-top: 1em;
+    }
+
+    #text {
+      width: 450px;
+      height: 200px;
+    }
   </style>
   <link id="googleFontLink" rel="stylesheet">
 </head>
+
 <body>
   <h1>描红字帖生成器</h1>
 
   <div class="form-row">
     <label>上传字体文件：<input type="file" id="fontFile" accept=".ttf,.otf" /></label>
     <label>Google 字体：<select id="googleFont"></select></label>
-    <label>字体大小：<input type="number" id="fontSize" value="36" min="12" max="100" /></label>
+    <label>字体大小：<input type="number" id="fontSize" value="40" min="12" max="100" /></label>
+  </div>
+  <div class="form-row">
     <label>描红颜色：<input type="color" id="fontColor" value="#ff0000" /></label>
     <label>网格颜色：<input type="color" id="gridColor" value="#cccccc" /></label>
     <label>跳过标点：<input type="checkbox" id="skipPunctuation" checked /></label>
@@ -35,7 +99,7 @@
 
   <label>描红内容：<textarea id="text">春眠不觉晓，处处闻啼鸟。夜来风雨声，花落知多少。</textarea></label>
 
-  <div class="form-row">
+  <div class="form-row" id="gridType">
     <label>格子类型：
       <span class="grid-option"><input type="radio" name="grid" value="mi" checked /> 米字格</span>
       <span class="grid-option"><input type="radio" name="grid" value="tian" /> 田字格</span>
@@ -43,7 +107,7 @@
     <label>每字一行：<input type="checkbox" id="charPerLine" /></label>
     <label>描红数量：<input type="number" id="guideCount" value="3" min="0" max="20" /></label>
     <label>作者名：<input type="text" id="author" placeholder="如：李明" /></label>
-    <button onclick="runGenerateMultipleTimes()">生成 PDF</button>
+    <button onclick="runGenerateMultipleTimes()">生成 PDF（如果文字替换不全，请再次点击生成）</button>
   </div>
 
   <div id="loadingStatus">正在生成 PDF，请稍候...</div>
@@ -66,7 +130,7 @@
       previewArea.style.fontSize = fontSizeInput.value + "px";
     });
 
-    document.getElementById("charPerLine").addEventListener("change", function() {
+    document.getElementById("charPerLine").addEventListener("change", function () {
       document.getElementById("guideCount").disabled = !this.checked;
     });
     window.addEventListener("DOMContentLoaded", () => {
@@ -75,7 +139,7 @@
 
     async function fetchChineseGoogleFonts() {
       const chineseFonts = [
-        "ZCOOL KuaiLe", "ZCOOL XiaoWei", "ZCOOL QingKe HuangYou", 
+        "ZCOOL KuaiLe", "ZCOOL XiaoWei", "ZCOOL QingKe HuangYou",
         "Ma Shan Zheng", "Zhi Mang Xing", "Long Cang", "Liu Jian Mao Cao",
         "Noto Sans SC", "Noto Serif SC", "Noto Sans TC", "Noto Serif TC", "Noto Sans HK", "Noto Serif HK",
         "Denk One", "Edu NSW ACT Foundation", "Kirang Haerang", "Gaegu", "Gugi", "Cute Font"
@@ -124,6 +188,12 @@
         }
       };
       reader.readAsArrayBuffer(file);
+    });
+
+    // 实时预览触发： 
+    // ['fontFile', 'googleFont', 'fontSize', 'gridType', 'fontColor', 'gridColor', 'text', 'charPerLine', 'guideCount']
+    ['fontFile', 'googleFont', 'gridType', 'text', 'charPerLine', 'guideCount'].forEach(id => {
+      document.getElementById(id).addEventListener('input', runGenerateMultipleTimes);
     });
 
     function runGenerateMultipleTimes() {
@@ -243,4 +313,5 @@
     }
   </script>
 </body>
+
 </html>
