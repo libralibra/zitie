@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <title>英文描红 PDF 生成器</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    textarea, input, button { margin: 5px 0; }
+    canvas { border: 1px solid #ccc; margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <h1>英文描红 PDF 生成器</h1>
+  
+  <label>文本内容:</label><br>
+  <textarea id="textInput" rows="5" cols="60">The quick brown fox jumps over the lazy dog.</textarea><br>
+
+  <label>字体大小:</label>
+  <input type="number" id="fontSize" value="20" min="10" max="72"><br>
+
+  <label>文字颜色:</label>
+  <input type="color" id="fontColor" value="#B3B3B3"><br>
+
+  <label>线条颜色:</label>
+  <input type="color" id="lineColor" value="#A0A0A0"><br>
+
+  <label>上传字体(.ttf):</label>
+  <input type="file" id="fontFile" accept=".ttf"><br>
+
+  <button onclick="generatePDF()">生成 PDF</button>
+
+  <h3>实时预览:</h3>
+  <canvas id="previewCanvas" width="595" height="842"></canvas> <!-- A4 大小像素预设 -->
+
+  <script>
+    const { jsPDF } = window.jspdf;
+    const canvas = document.getElementById('previewCanvas');
+    const ctx = canvas.getContext('2d');
+
+    let customFontData = null;
+
+    // 上传字体
+    document.getElementById('fontFile').addEventListener('change', function (e) {
+      const reader = new FileReader();
+      reader.onload = () => { customFontData = reader.result; };
+      reader.readAsDataURL(e.target.files[0]);
+    });
+
+    // 实时预览触发
+    ['textInput', 'fontSize', 'fontColor', 'lineColor'].forEach(id => {
+      document.getElementById(id).addEventListener('input', drawPreview);
+    });
+
+    function drawPreview() {
+      const text = document.getElementById('textInput').value;
+      const fontSize = parseInt(document.getElementById('fontSize').value);
+      const textColor = document.getElementById('fontColor').value;
+      const lineColor = document.getElementById('lineColor').value;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.font = `${fontSize}px Arial`;
+      ctx.fillStyle = textColor;
+      ctx.strokeStyle = lineColor;
+
+      const lineHeight = fontSize * 2.1;
+      const marginX = 40;
+      let y = 50;
+
+      const TOP = 1.0, MID = 0.755, BASE = 0.5, DESC = 0.25;
+
+      text.split('\n').forEach(line => {
+        if (y > canvas.height - 50) return;
+
+        const top = y;
+        const mid = y + lineHeight * (TOP - MID);
+        const base = y + lineHeight * (TOP - BASE);
+        const desc = y + lineHeight * (TOP - DESC);
+
+        [top, mid, base, desc].forEach((ly, i) => {
+          ctx.beginPath();
+          ctx.lineWidth = i === 0 || i === 3 ? 1 : 0.5;
+          ctx.moveTo(marginX, ly);
+          ctx.lineTo(canvas.width - marginX, ly);
+          ctx.stroke();
+        });
+
+        ctx.fillText(line, marginX + 5, base - 2); // 精准对齐 baseline
+        y += lineHeight + 5;
+      });
+    }
+
+    function generatePDF() {
+      const text = document.getElementById('textInput').value;
+      const fontSize = parseInt(document.getElementById('fontSize').value);
+      const textColor = document.getElementById('fontColor').value;
+      const lineColor = document.getElementById('lineColor').value;
+
+      const pdf = new jsPDF();
+
+      if (customFontData) {
+        pdf.addFileToVFS("custom.ttf", customFontData);
+        pdf.addFont("custom.ttf", "custom", "normal");
+        pdf.setFont("custom");
+      }
+
+      pdf.setFontSize(fontSize);
+
+      const PAGE_WIDTH = 210;
+      const PAGE_HEIGHT = 297;
+      const marginX = 10;
+      const lineHeight = fontSize * 2.1;
+      let y = 20;
+
+      const TOP = 1.0, MID = 0.755, BASE = 0.5, DESC = 0.25;
+
+      pdf.setTextColor(textColor);
+      pdf.setDrawColor(lineColor);
+
+      text.split('\n').forEach(line => {
+        if (y + lineHeight > PAGE_HEIGHT - 20) {
+          pdf.addPage();
+          y = 20;
+        }
+
+        const top = y;
+        const mid = y + lineHeight * (TOP - MID);
+        const base = y + lineHeight * (TOP - BASE);
+        const desc = y + lineHeight * (TOP - DESC);
+
+        [top, mid, base, desc].forEach((ly, i) => {
+          pdf.setLineWidth(i === 0 || i === 3 ? 0.8 : 0.5);
+          pdf.line(marginX, ly, PAGE_WIDTH - marginX, ly);
+        });
+
+        pdf.text(line, marginX + 2, base - 1);
+        y += lineHeight + 3;
+      });
+
+      pdf.save('tracing_output.pdf');
+    }
+
+    drawPreview(); // 初次绘制
+  </script>
+</body>
+</html>
