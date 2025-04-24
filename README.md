@@ -9,9 +9,12 @@
 - [x] 可单独设置文字与格子颜色
 - [x] 可添加作者名
 - [x] 使用在线文字列表，支持预览
+- [x] 英文字帖生成
 
 描红字帖生成，可打印PDF生成，
 
 ![截图](screenshot.png)
+
+![截图2](en_screenshot.png)
 
 更复杂的字帖生成，可尝试：[https://xgzb.top/han](https://xgzb.top/han)
